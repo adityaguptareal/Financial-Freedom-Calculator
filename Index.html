@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Perpetual Income Calculator</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+        }
+        .input-group label {
+            font-weight: 500;
+        }
+        .input-group input {
+            padding: 0.75rem 1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem; /* rounded-lg */
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .input-group input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.3);
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': '#4f46e5',
+                        'secondary': '#10b981',
+                        'bg-light': '#f7f9fb',
+                        'bg-card': '#ffffff',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="p-4 md:p-8 min-h-screen flex items-center justify-center">
+
+    <div class="w-full max-w-4xl bg-bg-card shadow-xl rounded-2xl p-6 md:p-10 border border-gray-100">
+        <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2 text-center">
+            Simple Financial Freedom Calculator
+        </h1>
+        <p class="text-center text-gray-500 mb-8">
+            Calculate the investment needed to cover your annual expense forever.
+        </p>
+
+        <!-- Main Grid for Inputs and Results -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+            <!-- Inputs Column (Span 2 columns on large screens) -->
+            <div class="lg:col-span-2 space-y-6 p-4 md:p-6 bg-gray-50 rounded-xl">
+                <h2 class="text-2xl font-semibold text-primary">Investment Inputs</h2>
+
+                <!-- Input 1: Annual Need -->
+                <div class="input-group">
+                    <label for="annualNeed" class="block text-lg text-gray-700 mb-2">1. Required Annual Expense (Rs.)</label>
+                    <input type="number" id="annualNeed" value="6000" placeholder="e.g., 6000" class="w-full" min="100">
+                    <p class="text-sm text-gray-400 mt-1">The amount you need to withdraw every year, like your skincare cost.</p>
+                </div>
+
+                <!-- Input 2: Interest Rate -->
+                <div class="input-group">
+                    <label for="interestRate" class="block text-lg text-gray-700 mb-2">2. Expected Annual Return Rate (%)</label>
+                    <input type="number" id="interestRate" value="8" placeholder="e.g., 8" class="w-full" min="0.1" max="30" step="0.1">
+                    <p class="text-sm text-gray-400 mt-1">The expected growth rate of your investment (e.g., 8% p.a.).</p>
+                </div>
+
+                <!-- Input 3: Time Horizon -->
+                <div class="input-group">
+                    <label for="timeHorizon" class="block text-lg text-gray-700 mb-2">3. Investment Time Horizon (Years)</label>
+                    <input type="number" id="timeHorizon" value="10" placeholder="e.g., 10" class="w-full" min="1" max="60">
+                    <p class="text-sm text-gray-400 mt-1">How many years you plan to invest monthly (SIP) for.</p>
+                </div>
+
+                <button id="calculateBtn" class="w-full bg-primary hover:bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg transition duration-200">
+                    Calculate My Freedom Plan
+                </button>
+            </div>
+
+            <!-- Results Column -->
+            <div class="lg:col-span-1 space-y-6 p-4 md:p-6 bg-secondary text-white rounded-xl flex flex-col justify-center">
+                <h2 class="text-2xl font-semibold mb-4 text-center">Your Results</h2>
+
+                <!-- Result 1: Required Corpus -->
+                <div class="bg-white text-gray-800 p-4 rounded-xl shadow-md">
+                    <p class="text-lg font-medium">Target Corpus Needed</p>
+                    <p id="corpusResult" class="text-4xl font-bold text-secondary mt-1">Rs. 0</p>
+                    <p class="text-sm text-gray-500 mt-2">Total investment amount required to generate your annual need perpetually.</p>
+                </div>
+
+                <!-- Result 2: Monthly SIP -->
+                <div class="bg-white text-gray-800 p-4 rounded-xl shadow-md">
+                    <p class="text-lg font-medium">Required Monthly SIP</p>
+                    <p id="sipResult" class="text-4xl font-bold text-primary mt-1">Rs. 0</p>
+                    <p class="text-sm text-gray-500 mt-2">Monthly investment needed to reach the Target Corpus by your time horizon.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables provided by the environment (using default values if undefined)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        // Note: Firestore is not strictly required for this purely mathematical calculator,
+        // but included for completeness if features like saving results were added later.
+        // For now, we only need the calculation logic.
+
+        /**
+         * Converts a number to a localized string with a currency format (Rs.).
+         * @param {number} amount - The numeric amount.
+         * @returns {string} The formatted string.
+         */
+        function formatCurrency(amount) {
+            // Use Intl.NumberFormat for standard Indian formatting
+            return new Intl.NumberFormat('en-IN', {
+                style: 'currency',
+                currency: 'INR',
+                maximumFractionDigits: 0
+            }).format(Math.round(amount)).replace('₹', 'Rs. ');
+        }
+
+        /**
+         * Calculates the required investment corpus for perpetual withdrawal.
+         * Corpus = Annual Need / Annual Rate
+         * @param {number} annualNeed - The required annual withdrawal amount.
+         * @param {number} annualRate - The expected annual return rate (as a decimal, e.g., 0.08).
+         * @returns {number} The required corpus.
+         */
+        function calculateRequiredCorpus(annualNeed, annualRate) {
+            if (annualRate <= 0) return 0; // Avoid division by zero or non-growing scenario
+            return annualNeed / annualRate;
+        }
+
+        /**
+         * Calculates the monthly SIP needed to reach a Future Value (Corpus)
+         * over a given time horizon. (Assumes investment at the beginning of the period)
+         * M = P / [ ( (1 + r)^n - 1 ) / r ] * (1 + r)
+         * @param {number} futureValue - The required corpus.
+         * @param {number} monthlyRate - The expected monthly return rate (as a decimal).
+         * @param {number} months - The total number of investment months.
+         * @returns {number} The required monthly SIP amount.
+         */
+        function calculateMonthlySIP(futureValue, monthlyRate, months) {
+            if (months <= 0) return futureValue; // If time is zero, the SIP is the full amount
+            if (monthlyRate === 0) return futureValue / months; // Simple division if no interest
+
+            // FV Factor for SIP invested at the start of the period
+            const fvFactor = ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate) * (1 + monthlyRate);
+
+            // Monthly SIP = Future Value / FV Factor
+            return futureValue / fvFactor;
+        }
+
+        /**
+         * Main calculation and display function.
+         */
+        function calculateAndDisplay() {
+            const annualNeed = parseFloat(document.getElementById('annualNeed').value);
+            const interestRate = parseFloat(document.getElementById('interestRate').value);
+            const timeHorizon = parseInt(document.getElementById('timeHorizon').value, 10);
+
+            const corpusResultEl = document.getElementById('corpusResult');
+            const sipResultEl = document.getElementById('sipResult');
+
+            corpusResultEl.textContent = 'Rs. 0';
+            sipResultEl.textContent = 'Rs. 0';
+
+            // 1. Input Validation
+            if (isNaN(annualNeed) || annualNeed <= 0 || isNaN(interestRate) || interestRate <= 0 || isNaN(timeHorizon) || timeHorizon <= 0) {
+                corpusResultEl.textContent = 'Invalid Input';
+                sipResultEl.textContent = 'Invalid Input';
+                console.error("Please enter valid, positive numbers for all fields.");
+                return;
+            }
+
+            // Convert Annual Rate to Decimal and Monthly Rate
+            const annualRateDecimal = interestRate / 100;
+            const monthlyRate = annualRateDecimal / 12;
+            const totalMonths = timeHorizon * 12;
+
+            // 2. Calculate Required Corpus (P)
+            const requiredCorpus = calculateRequiredCorpus(annualNeed, annualRateDecimal);
+
+            // 3. Calculate Monthly SIP (M)
+            const requiredMonthlySIP = calculateMonthlySIP(requiredCorpus, monthlyRate, totalMonths);
+
+            // 4. Display Results
+            corpusResultEl.textContent = formatCurrency(requiredCorpus);
+            sipResultEl.textContent = formatCurrency(requiredMonthlySIP);
+
+            // Optional: Log results for debugging
+            console.log(`Annual Need: ${annualNeed}`);
+            console.log(`Annual Rate: ${interestRate}%`);
+            console.log(`Time Horizon: ${timeHorizon} years`);
+            console.log(`Required Corpus (P): ${requiredCorpus.toFixed(2)}`);
+            console.log(`Required Monthly SIP (M): ${requiredMonthlySIP.toFixed(2)}`);
+        }
+
+        // Attach event listeners to button and input fields for instant calculation
+        document.addEventListener('DOMContentLoaded', () => {
+            const inputs = ['annualNeed', 'interestRate', 'timeHorizon'];
+            const calculateBtn = document.getElementById('calculateBtn');
+
+            // Initial calculation on load with default values
+            calculateAndDisplay();
+
+            // Calculate on button click
+            calculateBtn.addEventListener('click', calculateAndDisplay);
+
+            // Calculate on input change
+            inputs.forEach(id => {
+                const inputEl = document.getElementById(id);
+                inputEl.addEventListener('input', calculateAndDisplay);
+            });
+        });
+    </script>
+</body>
+</html>
